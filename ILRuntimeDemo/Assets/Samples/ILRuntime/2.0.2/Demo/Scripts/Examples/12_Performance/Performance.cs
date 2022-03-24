@@ -1,15 +1,24 @@
-﻿//#define XLUA_INSTALLED
+﻿#define XLUA_INSTALLED
+#define PUERTS_INSTALLED
 using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
-
 using UnityEngine.UI;
 using ILRuntime.Runtime;
 using ILRuntime.Runtime.Enviorment;
+#if PUERTS_INSTALLED
+using Puerts;
+//下面这行为了取消使用WWW的警告，Unity2018以后推荐使用UnityWebRequest，处于兼容性考虑Demo依然使用WWW
+#pragma warning disable CS0618
+#else
+//下面这行为了取消使用WWW的警告，Unity2018以后推荐使用UnityWebRequest，处于兼容性考虑Demo依然使用WWW
+#pragma warning disable CS0618
+#endif
 #if XLUA_INSTALLED
 using XLua;
+
 //下面这行为了取消使用WWW的警告，Unity2018以后推荐使用UnityWebRequest，处于兼容性考虑Demo依然使用WWW
 #pragma warning disable CS0618
 [LuaCallCSharp]
@@ -17,7 +26,6 @@ using XLua;
 //下面这行为了取消使用WWW的警告，Unity2018以后推荐使用UnityWebRequest，处于兼容性考虑Demo依然使用WWW
 #pragma warning disable CS0618
 #endif
-
 public class Performance : MonoBehaviour
 {
     public Button btnLoadStack;
@@ -25,7 +33,9 @@ public class Performance : MonoBehaviour
     public Button btnUnload;
     public CanvasGroup panelTest;
     public RectTransform panelButton;
+
     public Text lbResult;
+
     //AppDomain是ILRuntime的入口，最好是在一个单例类中保存，整个游戏全局就一个，这里为了示例方便，每个例子里面都单独做了一个
     //大家在正式项目中请全局只创建一个AppDomain
     AppDomain appdomain;
@@ -37,6 +47,16 @@ public class Performance : MonoBehaviour
     [XLua.CSharpCallLua]
     public delegate void LuaCallPerfCase(StringBuilder sb);
 #endif
+#if PUERTS_INSTALLED
+    JsEnv jsenv = null;
+
+    public delegate void TsCallPerfCase(StringBuilder sb);
+
+    public delegate TsCallPerfCase GetTsFunction(string str);
+
+    private GetTsFunction getTsFunc;
+#endif
+
     List<string> tests = new List<string>();
 
     private void Awake()
@@ -57,10 +77,10 @@ public class Performance : MonoBehaviour
         var go = panelButton.GetChild(0).gameObject;
         go.SetActive(false);
 
-        foreach(var i in tests)
+        foreach (var i in tests)
         {
             var child = Instantiate(go);
-            child.transform.SetParent(panelButton);            
+            child.transform.SetParent(panelButton);
             CreateTestButton(i, child);
             child.SetActive(true);
         }
@@ -85,16 +105,32 @@ public class Performance : MonoBehaviour
             }
             else
 #endif
-            appdomain.Invoke("HotFix_Project.TestPerformance", testName, null, sb);
+#if PUERTS_INSTALLED
+            if (jsenv != null)
+            {
+                //var perf = jsenv.Eval<TsCallPerfCase>(testName);
+                if (getTsFunc != null)
+                {
+                    var perf = getTsFunc(testName);
+                    perf(sb);
+                }
+                //var perf2= jsenv.Eval<System.Action<StringBuilder>>(@"const m = require('performance'); m.Test11;");
+                //var perf2= jsenv.Eval<System.Action<StringBuilder>>("m."+testName);
+                //perf2(sb);
+            }
+            else
+#endif
+                appdomain.Invoke("HotFix_Project.TestPerformance", testName, null, sb);
+
             lbResult.text = sb.ToString();
         });
     }
+
     public void LoadHotFixAssemblyStack()
     {
         //首先实例化ILRuntime的AppDomain，AppDomain是一个应用程序域，每个AppDomain都是一个独立的沙盒
         appdomain = new ILRuntime.Runtime.Enviorment.AppDomain();
         StartCoroutine(LoadHotFixAssembly());
-
     }
 
     public void LoadHotFixAssemblyRegister()
@@ -111,6 +147,20 @@ public class Performance : MonoBehaviour
         string luaStr = @"require 'performance'";
         luaenv = new LuaEnv();
         luaenv.DoString(luaStr);
+#else
+        lbResult.text = "请自行安装XLua并生成xlua绑定代码，将performance.lua复制到StreamingAssets后，解除Performace.cs第一行注释";
+        Debug.LogError("请自行安装XLua并生成xlua绑定代码后，将performance.lua复制到StreamingAssets后，解除Performace.cs第一行注释");
+#endif
+        OnHotFixLoaded();
+    }
+
+    public void LoadTS()
+    {
+#if PUERTS_INSTALLED
+        string tsStr = @"const m = require('performance'); m.getTsFunction;";
+        jsenv = new JsEnv();
+        jsenv.UsingAction<string>();
+        getTsFunc = jsenv.Eval<GetTsFunction>(tsStr);
 #else
         lbResult.text = "请自行安装XLua并生成xlua绑定代码，将performance.lua复制到StreamingAssets后，解除Performace.cs第一行注释";
         Debug.LogError("请自行安装XLua并生成xlua绑定代码后，将performance.lua复制到StreamingAssets后，解除Performace.cs第一行注释");
@@ -160,7 +210,8 @@ public class Performance : MonoBehaviour
         }
         catch
         {
-            Debug.LogError("加载热更DLL失败，请确保已经通过VS打开Assets/Samples/ILRuntime/1.6/Demo/HotFix_Project/HotFix_Project.sln编译过热更DLL");
+            Debug.LogError(
+                "加载热更DLL失败，请确保已经通过VS打开Assets/Samples/ILRuntime/1.6/Demo/HotFix_Project/HotFix_Project.sln编译过热更DLL");
         }
 
         InitializeILRuntime();
@@ -183,7 +234,6 @@ public class Performance : MonoBehaviour
     {
         btnUnload.interactable = true;
         panelTest.interactable = true;
-
     }
 
     public void Unload()
@@ -199,6 +249,11 @@ public class Performance : MonoBehaviour
         if (luaenv != null)
             luaenv.Dispose();
         luaenv = null;
+#endif
+#if PUERTS_INSTALLED
+        if (jsenv != null)
+            jsenv.Dispose();
+        jsenv = null;
 #endif
         btnUnload.interactable = false;
         btnLoadRegister.interactable = true;
@@ -218,7 +273,6 @@ public class Performance : MonoBehaviour
 
     void Update()
     {
-
     }
 
     public static bool MandelbrotCheck(float workX, float workY)
@@ -228,6 +282,5 @@ public class Performance : MonoBehaviour
 
     public static void TestFunc1(int a, string b, Transform d)
     {
-        
     }
 }

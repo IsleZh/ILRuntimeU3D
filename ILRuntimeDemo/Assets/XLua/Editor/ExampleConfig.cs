@@ -16,7 +16,7 @@ using System.Text;
 //配置的详细介绍请看Doc下《XLua的配置.doc》
 public static class ExampleConfig
 {
-    /***************如果你全lua编程，可以参考这份自动化配置***************/
+    /*/***************如果你全lua编程，可以参考这份自动化配置**************#1#
     //--------------begin 纯lua编程配置参考----------------------------
     static List<string> exclude = new List<string> {
         "HideInInspector", "ExecuteInEditMode",
@@ -136,7 +136,7 @@ public static class ExampleConfig
             return delegate_types.Where(t => t.BaseType == typeof(MulticastDelegate) && !hasGenericParameter(t) && !delegateHasEditorRef(t)).Distinct().ToList();
         }
     }
-    //--------------end 纯lua编程配置参考----------------------------
+    //--------------end 纯lua编程配置参考----------------------------*/
 
     /***************热补丁可以参考这份自动化配置***************/
     //[Hotfix]
@@ -246,6 +246,7 @@ public static class ExampleConfig
     //}
     //--------------end 热补丁自动化配置-------------------------
 
+
     //黑名单
     [BlackList]
     public static List<List<string>> BlackList = new List<List<string>>()  {
@@ -263,6 +264,9 @@ public static class ExampleConfig
                 new List<string>(){"UnityEngine.WWW", "GetMovieTexture"},
                 new List<string>(){"UnityEngine.AnimatorOverrideController", "PerformOverrideClipListCleanup"},
                 new List<string>(){"UnityEngine.Input", "IsJoystickPreconfigured" },
+                new List<string>(){"UnityEngine.Light", "SetLightDirty" },
+                new List<string>(){"UnityEngine.Light", "shadowRadius" },
+                new List<string>(){"UnityEngine.Light", "shadowAngle" },
     #if !UNITY_WEBPLAYER
                 new List<string>(){"UnityEngine.Application", "ExternalEval"},
     #endif
@@ -308,3 +312,4 @@ public static class ExampleConfig
     };
 #endif
 }
+
